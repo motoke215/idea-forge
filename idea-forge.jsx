@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import MD from "./src/MD";
 
+// 环境检测 - Capacitor 环境下使用原生 fetch
+const isCapacitor = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNative;
+
 // 模型配置
 const DEFAULT_MODELS = {
   "anthropic-claude": {
@@ -892,7 +895,13 @@ export default function IdeaForge() {
           messages: [{ role: "user", content: `你是一个专业的需求分析师。请严格按照以下规格生成文档。\n\n规格类型：${m.label}\n\n${m.systemPrompt(ans)}\n\n---\n用户想法：${ideaText}` }] };
 
     try {
-      const resp = await fetch(proxyBase + modelCfg.url.replace(/^https?:\/\/[^/]+/, ""), {
+      // Capacitor 环境下直接使用真实 API URL（androidScheme: "https" 配置已激活原生 HTTP 拦截）
+      // Web 开发环境使用 Vite 代理绕过 CORS
+      const requestUrl = isCapacitor
+        ? modelCfg.url
+        : proxyBase + modelCfg.url.replace(/^https?:\/\/[^/]+/, "");
+
+      const resp = await fetch(requestUrl, {
         method: "POST",
         headers,
         body: JSON.stringify(body),
