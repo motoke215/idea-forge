@@ -23,7 +23,7 @@ const DEFAULT_MODELS = {
   },
   "deepseek-chat": {
     name: "DeepSeek (DeepSeek)",
-    url: "https://api.deepseek.com/v1/chat/completions",
+    url: "https://api.deepseek.com/chat/completions",
     keyPlaceholder: "sk-...",
     defaultModel: "deepseek-chat",
   },
@@ -35,9 +35,9 @@ const DEFAULT_MODELS = {
   },
   "minimax": {
     name: "MiniMax (海螺)",
-    url: "https://api.minimax.chat/v1/text/chatcompletion_v2",
+    url: "https://api.minimaxi.com/v1/text/chatcompletion_v2",
     keyPlaceholder: "eyJh...",
-    defaultModel: "MiniMax-Text-01",
+    defaultModel: "M2-her",
   },
   "siliconflow": {
     name: "SiliconFlow (硅基流动)",
