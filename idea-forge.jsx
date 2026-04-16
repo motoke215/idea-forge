@@ -995,7 +995,7 @@ export default function IdeaForge() {
             <div style={{display:"flex",flexDirection:"column",gap:"0.3rem"}}>
               {history.map(h=>{
                 const hm=MODES.find(m=>m.id===h.modeId);
-                return <button key={h.id} onClick={()=>{setIdea(h.idea);setSelectedId(h.modeId);setAnswers(h.answers);setFinal(h.text);setStream(h.text);setPhase("output");setShowHist(false);}} style={{background:"#F0F8FF",border:"1px solid #B0D4E8",borderRadius:6,padding:"0.45rem 0.65rem",cursor:"pointer",textAlign:"left"}} onMouseEnter={e=>e.currentTarget.style.borderColor="#87CEEB"} onMouseLeave={e=>e.currentTarget.style.borderColor="#B0D4E8"}>
+                return <button key={h.id} onClick={()=>{setIdea(h.idea);setSelectedId(h.modeId);setAnswers(h.answers);setFinal(h.text);setStream(h.text);setPhase("output");setShowHist(false);} style={{background:"#F0F8FF",border:"1px solid #B0D4E8",borderRadius:6,padding:"0.45rem 0.65rem",cursor:"pointer",textAlign:"left"}} onMouseEnter={e=>e.currentTarget.style.borderColor="#87CEEB"} onMouseLeave={e=>e.currentTarget.style.borderColor="#B0D4E8"}>
                   <div style={{display:"flex",alignItems:"center",gap:"0.3rem",marginBottom:"0.15rem"}}>
                     <span style={{color:hm?.color,fontSize:"0.78rem"}}>{hm?.icon}</span>
                     <span style={{fontSize:"0.7rem",color:"#004488"}}>{hm?.label}</span>
