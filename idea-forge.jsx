@@ -68,7 +68,6 @@ const DEFAULT_MODELS = {
   },
 };
 
-// 电气工程师模式 - ASCII接线图示例
 const ASCII_WIRING_EXAMPLE = String.raw`
                     ┌─────────┐
     VIN ───────────┤    LDO   ├───┬── VDD (3.3V)
@@ -539,6 +538,17 @@ const CHAIN_MAP = {
   electrical:[],
 };
 
+// Capacitor 环境检测（运行时检测，确保 Capacitor 对象已初始化）
+const detectCapacitor = () => {
+  if (typeof window === 'undefined') return false;
+  if (!window.Capacitor) return false;
+  // Capacitor 4+ 检测方式
+  if (window.Capacitor.isNative === true) return true;
+  // 备用检测：检查 platform
+  if (window.Capacitor?.platform === 'android') return true;
+  return false;
+};
+
 export default function IdeaForge() {
   const [phase, setPhase] = useState("input");
   const [idea, setIdea] = useState("");
@@ -868,11 +878,15 @@ export default function IdeaForge() {
           messages: [{ role: "user", content: `你是一个专业的需求分析师。请严格按照以下规格生成文档。\n\n规格类型：${m.label}\n\n${m.systemPrompt(ans)}\n\n---\n用户想法：${ideaText}` }] };
 
     try {
-      // 运行时检测 Capacitor 环境（每次调用时检测，避免模块加载时 Capacitor 未初始化的问题）
-      const isCapacitor = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNative;
+      // 运行时检测 Capacitor 环境
+      const isCapacitor = detectCapacitor();
+      console.log("[IdeaForge] 请求信息:", {
+        isCapacitor,
+        capacitorObj: window.Capacitor ? { isNative: window.Capacitor.isNative, platform: window.Capacitor.platform } : null,
+        requestUrl: isCapacitor ? modelCfg.url : proxyBase + modelCfg.url.replace(/^https?:\/\/[^/]+/, ""),
+        model: activeModel
+      });
 
-      // Capacitor 环境下直接使用真实 API URL（androidScheme: "https" 配置已激活原生 HTTP 拦截）
-      // Web 开发环境使用 Vite 代理绕过 CORS
       const requestUrl = isCapacitor
         ? modelCfg.url
         : proxyBase + modelCfg.url.replace(/^https?:\/\/[^/]+/, "");
@@ -885,6 +899,7 @@ export default function IdeaForge() {
 
       if (!resp.ok) {
         const errorText = await resp.text().catch(() => "未知错误");
+        console.error("[IdeaForge] HTTP 错误:", resp.status, errorText.slice(0, 200));
         throw new Error(`HTTP ${resp.status}: ${errorText.slice(0, 200)}`);
       }
 
@@ -916,6 +931,7 @@ export default function IdeaForge() {
       setPhase("output");
       setHistory(prev => [{id:Date.now(),modeId,idea:ideaText.slice(0,60),text:full,answers:{...ans},time:new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})},...prev.slice(0,9)]);
     } catch (e) {
+      console.error("[IdeaForge] 请求失败:", e);
       setGenStatus("error");
       setGenError(e.message || "生成失败，请检查网络和 API 配置");
       setPhase("clarify");
