@@ -1,9 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import MD from "./src/MD";
 
-// 环境检测 - Capacitor 环境下使用原生 fetch
-const isCapacitor = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNative;
-
 // 模型配置
 const DEFAULT_MODELS = {
   "anthropic-claude": {
@@ -61,7 +58,7 @@ const DEFAULT_MODELS = {
       "meta-llama/Meta-Llama-3.1-70B-Instruct",
       "custom",
     ],
-    hasImageGen: false, // 标记是否有图像生成能力
+    hasImageGen: false,
   },
   "custom": {
     name: "自定义 API",
@@ -71,7 +68,7 @@ const DEFAULT_MODELS = {
   },
 };
 
-// 电气工程师模式 - ASCII接线图示例（使用 String.raw 避免 Unicode 问题）
+// 电气工程师模式 - ASCII接线图示例
 const ASCII_WIRING_EXAMPLE = String.raw`
                     ┌─────────┐
     VIN ───────────┤    LDO   ├───┬── VDD (3.3V)
@@ -462,9 +459,9 @@ IF 均未达标 → [pivot选项]
 - 主要应用场景
 
 ## 2. 系统架构
-```
+\`\`\`
 [系统架构框图 - ASCII]
-```
+\`\`\`
 
 ## 3. 元件清单（BOM）
 | 位号 | 元件名称 | 规格型号 | 数量 | 备注 |
@@ -538,8 +535,8 @@ const CHAIN_MAP = {
   mvp:[{id:"vibe_spec",label:"Coding 规格"},{id:"marketing",label:"营销文案"}],
   research:[{id:"prd_full",label:"PRD 文档"},{id:"mvp",label:"MVP 规划"}],
   rfc:[{id:"vibe_spec",label:"Vibe Coding 规格"}],
-  comic:[], // 漫画模式独立流程
-  electrical:[], // 电气工程师模式独立流程
+  comic:[],
+  electrical:[],
 };
 
 export default function IdeaForge() {
@@ -553,13 +550,12 @@ export default function IdeaForge() {
   const [showHist, setShowHist] = useState(false);
   const [copied, setCopied] = useState(false);
   const [sectCount, setSectCount] = useState(0);
-  const [genStatus, setGenStatus] = useState("idle"); // idle | connecting | streaming | done | error
+  const [genStatus, setGenStatus] = useState("idle");
   const [genError, setGenError] = useState("");
   const scrollRef = useRef(null);
   const mode = MODES.find(m => m.id === selectedId);
-  const savedAnswersRef = useRef({}); // 保存生成时的参数用于重试
+  const savedAnswersRef = useRef({});
 
-  // 模型配置状态
   const [activeModel, setActiveModel] = useState(() => localStorage.getItem("ideaforge_active_model") || "anthropic-claude");
   const [modelConfigs, setModelConfigs] = useState(() => {
     const saved = localStorage.getItem("ideaforge_model_configs");
@@ -567,22 +563,19 @@ export default function IdeaForge() {
   });
   const [showSettings, setShowSettings] = useState(false);
   const [showKeyIds, setShowKeyIds] = useState({});
-  const [editMode, setEditMode] = useState(false); // 预览/编辑切换
+  const [editMode, setEditMode] = useState(false);
 
-  // 漫画模式专用状态
-  const [comicScript, setComicScript] = useState(""); // 用户编辑后的漫画脚本
-  const [comicPanels, setComicPanels] = useState([]); // 解析出的分镜列表
-  const [comicImages, setComicImages] = useState([]); // 生成的漫画图片
-  const [comicGenStatus, setComicGenStatus] = useState("idle"); // idle | generating | done | error
+  const [comicScript, setComicScript] = useState("");
+  const [comicPanels, setComicPanels] = useState([]);
+  const [comicImages, setComicImages] = useState([]);
+  const [comicGenStatus, setComicGenStatus] = useState("idle");
   const [comicGenError, setComicGenError] = useState("");
   const [currentGeneratingPanel, setCurrentGeneratingPanel] = useState(0);
-  const [imageGenApi, setImageGenApi] = useState(""); // 图像生成API配置
+  const [imageGenApi, setImageGenApi] = useState("");
 
-  // 文件导入状态
-  const [importedFiles, setImportedFiles] = useState([]); // 已导入的文件列表
+  const [importedFiles, setImportedFiles] = useState([]);
   const [isImporting, setIsImporting] = useState(false);
 
-  // 导入文件
   const handleFileImport = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -597,10 +590,8 @@ export default function IdeaForge() {
         const ext = file.name.split(".").pop().toLowerCase();
 
         if (ext === "txt" || ext === "md" || ext === "json" || ext === "yaml" || ext === "yml" || ext === "xml" || ext === "csv" || ext === "log") {
-          // 文本文件直接读取
           content = await file.text();
         } else if (ext === "js" || ext === "ts" || ext === "jsx" || ext === "tsx" || ext === "py" || ext === "html" || ext === "css" || ext === "java" || ext === "c" || ext === "cpp" || ext === "h" || ext === "go" || ext === "rs" || ext === "rb" || ext === "php" || ext === "swift" || ext === "kt") {
-          // 代码文件
           content = await file.text();
         } else if (ext === "pdf") {
           content = `[PDF文件: ${file.name}]\n此文件为PDF格式，内容无法直接读取。建议：\n1. 将PDF内容复制为文本后保存为txt文件再导入\n2. 或手动提取关键内容粘贴到下方输入框`;
@@ -609,7 +600,6 @@ export default function IdeaForge() {
         } else if (ext === "png" || ext === "jpg" || ext === "jpeg" || ext === "gif" || ext === "bmp" || ext === "webp") {
           content = `[图片文件: ${file.name}]\n图片内容无法直接读取为文本。`;
         } else {
-          // 尝试作为文本读取
           try {
             content = await file.text();
           } catch {
@@ -625,7 +615,6 @@ export default function IdeaForge() {
       }
     }
 
-    // 追加到现有想法或替换
     const newIdea = idea ? `${idea}\n\n${allContent}` : allContent;
     setIdea(newIdea);
     setImportedFiles(prev => [...prev, ...newFiles]);
@@ -633,17 +622,14 @@ export default function IdeaForge() {
     e.target.value = "";
   };
 
-  // 清除已导入的文件
   const clearImportedFiles = () => {
     setImportedFiles([]);
   };
 
-  // 切换 KEY 显示/隐藏
   const toggleShowKey = (modelId) => {
     setShowKeyIds(prev => ({ ...prev, [modelId]: !prev[modelId] }));
   };
 
-  // 更新某个模型的配置
   const updateModelConfig = (modelId, field, value) => {
     const newConfigs = {
       ...modelConfigs,
@@ -656,12 +642,10 @@ export default function IdeaForge() {
     setModelConfigs(newConfigs);
   };
 
-  // 打开设置
   const openSettings = () => {
     setShowSettings(true);
   };
 
-  // 导出模板
   const exportTemplates = () => {
     const data = {
       version: "1.0",
@@ -681,7 +665,6 @@ export default function IdeaForge() {
     a.click();
   };
 
-  // 导入模板
   const importTemplates = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -705,7 +688,6 @@ export default function IdeaForge() {
     e.target.value = "";
   };
 
-  // 解析漫画脚本，提取分镜列表
   const parseComicPanels = (script) => {
     const panels = [];
     const regex = /【镜头(\d+)】([^\n]+)\n([\s\S]*?)(?=【镜头|\n\n## |$)/g;
@@ -720,7 +702,6 @@ export default function IdeaForge() {
     return panels;
   };
 
-  // 生成漫画图片
   const generateComicImages = async () => {
     const imgApiConfig = modelConfigs["image_gen"] || {};
     const apiKey = imgApiConfig?.key;
@@ -758,7 +739,6 @@ export default function IdeaForge() {
         let imageUrl = "";
 
         if (provider === "stabilityai") {
-          // Stability AI API
           const resp = await fetch("https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image", {
             method: "POST",
             headers: {
@@ -778,7 +758,6 @@ export default function IdeaForge() {
             imageUrl = `data:image/png;base64,${data.artifacts[0].base64}`;
           }
         } else if (provider === "openai") {
-          // OpenAI DALL-E API
           const resp = await fetch("https://api.openai.com/v1/images/generations", {
             method: "POST",
             headers: {
@@ -797,7 +776,6 @@ export default function IdeaForge() {
             imageUrl = data.data[0].url;
           }
         } else {
-          // Custom API
           const customUrl = imgApiConfig?.url || "";
           if (!customUrl) {
             throw new Error("未配置自定义 API 地址");
@@ -826,7 +804,6 @@ export default function IdeaForge() {
     setPhase("comic_output");
   };
 
-  // 下载漫画图片
   const downloadComicImages = () => {
     comicImages.forEach((img, idx) => {
       const a = document.createElement("a");
@@ -836,10 +813,8 @@ export default function IdeaForge() {
     });
   };
 
-  // 获取当前模型的 API Key
   const getActiveModelKey = () => modelConfigs[activeModel]?.key || "";
 
-  // 获取当前模型的完整配置
   const getActiveModelConfig = () => {
     const cfg = modelConfigs[activeModel] || {};
     return {
@@ -869,10 +844,8 @@ export default function IdeaForge() {
     setGenError("");
     savedAnswersRef.current = ans;
 
-    // 根据不同模型构建请求
     const isAnthropic = activeModel === "anthropic-claude";
 
-    // 代理映射
     const PROXY_MAP = {
       "anthropic-claude": "/api/anthropic",
       "openai-gpt4": "/api/openai",
@@ -895,6 +868,9 @@ export default function IdeaForge() {
           messages: [{ role: "user", content: `你是一个专业的需求分析师。请严格按照以下规格生成文档。\n\n规格类型：${m.label}\n\n${m.systemPrompt(ans)}\n\n---\n用户想法：${ideaText}` }] };
 
     try {
+      // 运行时检测 Capacitor 环境（每次调用时检测，避免模块加载时 Capacitor 未初始化的问题）
+      const isCapacitor = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNative;
+
       // Capacitor 环境下直接使用真实 API URL（androidScheme: "https" 配置已激活原生 HTTP 拦截）
       // Web 开发环境使用 Vite 代理绕过 CORS
       const requestUrl = isCapacitor
@@ -923,18 +899,15 @@ export default function IdeaForge() {
           if (l.trim() === "data: [DONE]") break;
           try {
             const d = JSON.parse(l.slice(6));
-            // Anthropic 格式
             if (d.type === "content_block_delta" && d.delta?.text) {
               full += d.delta.text; setStream(full);
               setSectCount((full.match(/^#{1,2} /gm) || []).length);
             }
-            // OpenAI/Groq/DeepSeek 格式 (SSE)
             if (d.choices && d.choices[0]?.delta?.content) {
               full += d.choices[0].delta.content; setStream(full);
               setSectCount((full.match(/^#{1,2} /gm) || []).length);
             }
           } catch (e) {
-            // 忽略解析错误，继续
           }
         }
       }
@@ -949,7 +922,6 @@ export default function IdeaForge() {
     }
   };
 
-  // 重试函数
   const retryGenerate = () => {
     if (idea && selectedId) {
       generate(idea, selectedId, savedAnswersRef.current);
@@ -975,7 +947,6 @@ export default function IdeaForge() {
 
       <div style={{maxWidth:840,margin:"0 auto",padding:"1.8rem 1.1rem",position:"relative",zIndex:1}}>
 
-        {/* NAV */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.7rem"}}>
           <div style={{display:"flex",alignItems:"center",gap:"0.55rem"}}>
             <div style={{width:27,height:27,background:"linear-gradient(135deg,#87CEEB,#004488)",borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.82rem",boxShadow:"0 0 12px rgba(135,206,235,0.7)"}}>⬡</div>
@@ -988,7 +959,6 @@ export default function IdeaForge() {
           </div>
         </div>
 
-        {/* HISTORY */}
         {showHist&&history.length>0&&(
           <div style={{marginBottom:"1.3rem",background:"#FFFFFF",border:"1px solid #B0D4E8",borderRadius:9,padding:"0.8rem"}}>
             <div style={{fontSize:"0.65rem",color:"#004488",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:"0.55rem"}}>历史记录</div>
@@ -1008,10 +978,8 @@ export default function IdeaForge() {
           </div>
         )}
 
-        {/* INPUT */}
         {phase==="input"&&(
           <div style={{display:"flex",flexDirection:"column",gap:"1.2rem"}}>
-            {/* 模型选择 + 文件导入 同一行 */}
             <div style={{display:"flex",flexWrap:"wrap",alignItems:"center",gap:"0.6rem"}}>
               <div style={{fontSize:"0.65rem",color:"#004488",letterSpacing:"0.08em",textTransform:"uppercase"}}>选择模型</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:"0.3rem",flex:1}}>
@@ -1036,7 +1004,6 @@ export default function IdeaForge() {
                 <input type="file" multiple accept=".txt,.md,.json,.yaml,.yml,.xml,.csv,.js,.ts,.jsx,.tsx,.py,.html,.css,.java,.c,.cpp,.h,.go,.rs,.rb,.php,.swift,.kt,.pdf,.doc,.docx,.log" onChange={handleFileImport} style={{display:"none"}} />
               </label>
             </div>
-            {/* 想法输入框 */}
             <div>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"0.4rem"}}>
                 <div style={{fontSize:"0.65rem",color:"#004488",letterSpacing:"0.08em",textTransform:"uppercase"}}>你的想法</div>
@@ -1081,7 +1048,6 @@ export default function IdeaForge() {
           </div>
         )}
 
-        {/* CLARIFY */}
         {phase==="clarify"&&mode&&(
           <div style={{display:"flex",flexDirection:"column",gap:"1.2rem"}}>
             <div style={{background:"#FFFFFF",border:"1px solid #B0D4E8",borderRadius:8,padding:"0.7rem 0.85rem",display:"flex",alignItems:"flex-start",gap:"0.5rem"}}>
@@ -1116,10 +1082,9 @@ export default function IdeaForge() {
           </div>
         )}
 
-        {/* GENERATING */}
         {phase==="generating"&&mode&&(
           <div style={{display:"flex",flexDirection:"column",gap:"0.9rem"}}>
-            <div style={{display:"flex",alignItems:"center",gap:"0.6rem",padding:"0.4rem 0"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"0.6rem",padding:"0.4rem 0 "}}>
               {genStatus === "connecting" ? (
                 <>
                   <div style={{width:6,height:6,borderRadius:"50%",background:"#88AACC",animation:"pulse 1s infinite"}} />
@@ -1153,10 +1118,8 @@ export default function IdeaForge() {
           </div>
         )}
 
-        {/* OUTPUT */}
         {phase==="output"&&mode&&(
           <div style={{display:"flex",flexDirection:"column",gap:"0.8rem"}}>
-            {/* 当前参数显示 */}
             <div style={{background:"#F0F8FF",border:"1px solid #B0D4E8",borderRadius:8,padding:"0.6rem 0.8rem",fontSize:"0.72rem",color:"#336699"}}>
               <strong>当前参数：</strong>
               {Object.entries(history[0]?.answers || {}).map(([k, v]) => ` ${k}: ${v}`).join(" | ")}
@@ -1205,7 +1168,6 @@ export default function IdeaForge() {
           </div>
         )}
 
-        {/* COMIC SCRIPT EDITOR */}
         {phase === "comic_script" && (
           <div style={{display:"flex",flexDirection:"column",gap:"0.8rem"}}>
             <div style={{background:"linear-gradient(135deg,#FFF0F5,#FFE4EC)",border:"1px solid #FFB6C1",borderRadius:8,padding:"0.8rem",display:"flex",alignItems:"center",gap:"0.5rem"}}>
@@ -1236,7 +1198,6 @@ export default function IdeaForge() {
           </div>
         )}
 
-        {/* COMIC GENERATING */}
         {phase === "comic_generating" && (
           <div style={{display:"flex",flexDirection:"column",gap:"1rem",alignItems:"center",padding:"2rem 1rem"}}>
             <div style={{fontSize:"3rem",animation:"pulse 1.5s infinite"}}>🎨</div>
@@ -1252,7 +1213,6 @@ export default function IdeaForge() {
           </div>
         )}
 
-        {/* COMIC OUTPUT */}
         {phase === "comic_output" && comicImages.length > 0 && (
           <div style={{display:"flex",flexDirection:"column",gap:"0.8rem"}}>
             <div style={{background:"linear-gradient(135deg,#FFF0F5,#FFE4EC)",border:"1px solid #FFB6C1",borderRadius:8,padding:"0.8rem",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -1282,7 +1242,7 @@ export default function IdeaForge() {
           </div>
         )}
       </div>
-      {/* 设置弹窗 */}
+
       {showSettings && (
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,overflowY:"auto",padding:"1rem"}} onClick={(e) => e.target === e.currentTarget && setShowSettings(false)}>
           <div style={{background:"#FFFFFF",border:"1px solid #B0D4E8",borderRadius:12,padding:"1.5rem",width:480,maxWidth:"95vw",maxHeight:"90vh",overflowY:"auto"}}>
@@ -1296,7 +1256,6 @@ export default function IdeaForge() {
                 <div key={key} style={{background:"#F8FBFF",border:"1px solid #B0D4E8",borderRadius:8,padding:"0.8rem"}}>
                   <div style={{fontSize:"0.85rem",color:"#004488",marginBottom:"0.5rem",fontWeight:600}}>{model.name}</div>
 
-                  {/* API Key */}
                   <div style={{marginBottom:"0.5rem"}}>
                     <div style={{fontSize:"0.68rem",color:"#6699BB",marginBottom:"0.2rem"}}>API Key</div>
                     <div style={{display:"flex",gap:"0.3rem"}}>
@@ -1311,7 +1270,6 @@ export default function IdeaForge() {
                     </div>
                   </div>
 
-                  {/* 模型名称 */}
                   {model.models ? (
                     <div>
                       <div style={{fontSize:"0.68rem",color:"#6699BB",marginBottom:"0.2rem"}}>选择模型</div>
@@ -1338,7 +1296,6 @@ export default function IdeaForge() {
               ))}
             </div>
 
-            {/* 模板导入/导出 */}
             <div style={{marginTop:"1.2rem",paddingTop:"1rem",borderTop:"1px solid #B0D4E8"}}>
               <div style={{fontSize:"0.75rem",color:"#004488",marginBottom:"0.5rem",fontWeight:600}}>模板管理</div>
               <div style={{display:"flex",gap:"0.5rem"}}>
@@ -1351,7 +1308,6 @@ export default function IdeaForge() {
               <div style={{fontSize:"0.65rem",color:"#88AACC",marginTop:"0.3rem"}}>支持 JSON 格式，用于备份或分享模板配置</div>
             </div>
 
-            {/* CORS 代理说明 */}
             <div style={{marginTop:"0.8rem",padding:"0.6rem",background:"#FFF9E6",border:"1px solid #FFE4A0",borderRadius:6}}>
               <div style={{fontSize:"0.72rem",color:"#996600",marginBottom:"0.25rem"}}>💡 提示</div>
               <div style={{fontSize:"0.65rem",color:"#AA8800",lineHeight:1.5}}>
@@ -1360,7 +1316,6 @@ export default function IdeaForge() {
               </div>
             </div>
 
-            {/* 图像生成 API 配置 */}
             <div style={{marginTop:"0.8rem",padding:"0.7rem",background:"#FFF0F5",border:"1px solid #FFB6C1",borderRadius:6}}>
               <div style={{fontSize:"0.75rem",color:"#CC3366",marginBottom:"0.5rem",fontWeight:600}}>图像生成 API（漫画模式专用）</div>
               <div style={{marginBottom:"0.5rem"}}>
