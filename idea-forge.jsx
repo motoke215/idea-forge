@@ -412,7 +412,6 @@ IF 均未达标 → [pivot选项]
 
 ## 第二幕：...
 
-
 **角色设定表：**
 | 角色名 | 年龄 | 外貌特征 | 性格 | 口头禅 |
 |--------|------|----------|------|--------|
@@ -538,14 +537,12 @@ const CHAIN_MAP = {
   electrical:[],
 };
 
-// Capacitor 环境检测（运行时检测，确保 Capacitor 对象已初始化）
+// Capacitor 环境检测（运行时检测）
 const detectCapacitor = () => {
   if (typeof window === 'undefined') return false;
   if (!window.Capacitor) return false;
-  // Capacitor 4+ 检测方式
   if (window.Capacitor.isNative === true) return true;
-  // 备用检测：检查 platform
-  if (window.Capacitor?.platform === 'android') return true;
+  if (window.Capacitor.platform === 'android') return true;
   return false;
 };
 
@@ -562,6 +559,7 @@ export default function IdeaForge() {
   const [sectCount, setSectCount] = useState(0);
   const [genStatus, setGenStatus] = useState("idle");
   const [genError, setGenError] = useState("");
+  const [debugInfo, setDebugInfo] = useState(""); // 调试信息
   const scrollRef = useRef(null);
   const mode = MODES.find(m => m.id === selectedId);
   const savedAnswersRef = useRef({});
@@ -852,6 +850,7 @@ export default function IdeaForge() {
     setSectCount(0);
     setGenStatus("connecting");
     setGenError("");
+    setDebugInfo("");
     savedAnswersRef.current = ans;
 
     const isAnthropic = activeModel === "anthropic-claude";
@@ -880,16 +879,14 @@ export default function IdeaForge() {
     try {
       // 运行时检测 Capacitor 环境
       const isCapacitor = detectCapacitor();
-      console.log("[IdeaForge] 请求信息:", {
-        isCapacitor,
-        capacitorObj: window.Capacitor ? { isNative: window.Capacitor.isNative, platform: window.Capacitor.platform } : null,
-        requestUrl: isCapacitor ? modelCfg.url : proxyBase + modelCfg.url.replace(/^https?:\/\/[^/]+/, ""),
-        model: activeModel
-      });
-
       const requestUrl = isCapacitor
         ? modelCfg.url
         : proxyBase + modelCfg.url.replace(/^https?:\/\/[^/]+/, "");
+
+      // 设置调试信息（显示在界面上）
+      const dbg = `请求URL: ${requestUrl}\n模型: ${activeModel}\nCapacitor: ${isCapacitor ? '是' : '否 (Web代理模式)'}\nAPI URL: ${modelCfg.url}`;
+      setDebugInfo(dbg);
+      console.log("[IdeaForge]", dbg);
 
       const resp = await fetch(requestUrl, {
         method: "POST",
@@ -899,8 +896,10 @@ export default function IdeaForge() {
 
       if (!resp.ok) {
         const errorText = await resp.text().catch(() => "未知错误");
-        console.error("[IdeaForge] HTTP 错误:", resp.status, errorText.slice(0, 200));
-        throw new Error(`HTTP ${resp.status}: ${errorText.slice(0, 200)}`);
+        const errMsg = `HTTP ${resp.status}: ${errorText.slice(0, 300)}`;
+        console.error("[IdeaForge] HTTP错误:", errMsg);
+        setDebugInfo(prev => prev + `\n\n错误: ${errMsg}`);
+        throw new Error(errMsg);
       }
 
       setGenStatus("streaming");
@@ -929,11 +928,14 @@ export default function IdeaForge() {
       setGenStatus("done");
       setFinal(full);
       setPhase("output");
+      setDebugInfo(prev => prev + `\n\n✓ 成功收到响应`);
       setHistory(prev => [{id:Date.now(),modeId,idea:ideaText.slice(0,60),text:full,answers:{...ans},time:new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})},...prev.slice(0,9)]);
     } catch (e) {
       console.error("[IdeaForge] 请求失败:", e);
       setGenStatus("error");
-      setGenError(e.message || "生成失败，请检查网络和 API 配置");
+      const errMsg = e.message || "生成失败，请检查网络和 API 配置";
+      setGenError(errMsg);
+      setDebugInfo(prev => prev + `\n\n异常: ${errMsg}`);
       setPhase("clarify");
     }
   };
@@ -1126,6 +1128,13 @@ export default function IdeaForge() {
                 </>
               )}
             </div>
+            {/* 调试信息面板 */}
+            {debugInfo && (
+              <div style={{background:"#1a1a2e",border:"1px solid #444",borderRadius:8,padding:"0.7rem",fontSize:"0.7rem",fontFamily:"'Courier New',monospace",color:"#0f0"}}>
+                <div style={{color:"#888",marginBottom:"0.3rem"}}>🔧 调试信息（请截图发给我）</div>
+                <pre style={{margin:0,whiteSpace:"pre-wrap",wordBreak:"break-all",color:"#0f0"}}>{debugInfo}</pre>
+              </div>
+            )}
             {genStatus === "error" && (
               <div style={{background:"#FFF5F5",border:"1px solid #FFCCCC",borderRadius:8,padding:"0.8rem",color:"#CC4444",fontSize:"0.8rem"}}>
                 <strong>生成失败：</strong>{genError}
