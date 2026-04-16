@@ -40,14 +40,8 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           
-      - name: Build Android APK
-        uses: android/gradle-build-action@v2
-        with:
-          gradle-version: 8.4
-          arguments: assembleDebug
-          build-root-directory: android
-          artifact-name: IdeaForge-debug
-          artifact-path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Build APK
+        run: cd android && ./gradlew assembleDebug --no-daemon
       
       - name: Upload APK
         uses: actions/upload-artifact@v4
