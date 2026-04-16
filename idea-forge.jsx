@@ -1,47 +1,61 @@
 import { useState, useRef, useEffect } from "react";
 import MD from "./src/MD";
+import { Http } from "@capacitor-community/http";
+
+// 环境检测 - 检查是否在 Capacitor 环境中
+const isCapacitor = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNative;
+
+// 获取模型 URL - 根据环境返回正确的 URL
+const getModelUrl = (providerKey, directUrl, path) => {
+  if (isCapacitor) {
+    // Capacitor 环境使用直接 URL
+    return directUrl + path;
+  }
+  // Web 开发环境使用代理
+  return `/api/${providerKey}${path}`;
+};
 
 // 模型配置
 const DEFAULT_MODELS = {
   "anthropic-claude": {
     name: "Claude (Anthropic)",
-    url: "https://api.anthropic.com/v1/messages",
+    getUrl: () => getModelUrl('anthropic', 'https://api.anthropic.com', '/v1/messages'),
     keyPlaceholder: "sk-ant-...",
     defaultModel: "claude-sonnet-4-20250514",
   },
   "openai-gpt4": {
     name: "GPT-4 (OpenAI)",
-    url: "https://api.openai.com/v1/chat/completions",
+    getUrl: () => getModelUrl('openai', 'https://api.openai.com', '/v1/chat/completions'),
     keyPlaceholder: "sk-...",
     defaultModel: "gpt-4-turbo",
   },
   "groq-llama": {
     name: "Llama (Groq)",
-    url: "https://api.groq.com/openai/v1/chat/completions",
+    getUrl: () => getModelUrl('groq', 'https://api.groq.com', '/openai/v1/chat/completions'),
     keyPlaceholder: "gsk_...",
     defaultModel: "llama-3.3-70b-versatile",
   },
   "deepseek-chat": {
     name: "DeepSeek (DeepSeek)",
-    url: "https://api.deepseek.com/chat/completions",
+    getUrl: () => getModelUrl('deepseek', 'https://api.deepseek.com', '/v1/chat/completions'),
     keyPlaceholder: "sk-...",
     defaultModel: "deepseek-chat",
   },
   "qwen-turbo": {
     name: "Qwen (DashScope)",
-    url: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    getUrl: () => getModelUrl('dashscope', 'https://dashscope.aliyuncs.com', '/compatible-mode/v1/chat/completions'),
     keyPlaceholder: "sk-...",
     defaultModel: "qwen-turbo",
   },
   "minimax": {
     name: "MiniMax (海螺)",
-    url: "https://api.minimaxi.com/v1/text/chatcompletion_v2",
+    getUrl: () => getModelUrl('minimax', 'https://api.minimax.chat', '/v1/text/chatcompletion_v2'),
     keyPlaceholder: "eyJh...",
-    defaultModel: "M2-her",
+    defaultModel: "MiniMax-Text-01",
   },
   "siliconflow": {
     name: "SiliconFlow (硅基流动)",
-    url: "https://api.siliconflow.cn/v1/chat/completions",
+    getUrl: () => getModelUrl('siliconflow', 'https://api.siliconflow.cn', '/v1/chat/completions'),
     keyPlaceholder: "sk-...",
     defaultModel: "Qwen/Qwen2.5-7B-Instruct",
     models: [
@@ -62,7 +76,7 @@ const DEFAULT_MODELS = {
   },
   "custom": {
     name: "自定义 API",
-    url: "",
+    getUrl: () => "",
     keyPlaceholder: "API Key",
     defaultModel: "",
   },
@@ -131,24 +145,6 @@ const CHAIN_MAP = {
   research:[{id:"prd_full",label:"PRD 文档"},{id:"mvp",label:"MVP 规划"}],
   rfc:[{id:"vibe_spec",label:"Vibe Coding 规格"}],
   comic:[], electrical:[],
-};
-
-const detectCapacitor = () => {
-  if (typeof window === 'undefined') return false;
-  if (!window.Capacitor) return false;
-  if (window.Capacitor.isNative === true) return true;
-  if (window.Capacitor.platform === 'android') return true;
-  return false;
-};
-
-// 带超时的 fetch
-const fetchWithTimeout = (url, options, timeoutMs = 20000) => {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`请求超时（${timeoutMs/1000}秒），请检查网络连接或API配置`)), timeoutMs);
-    fetch(url, options)
-      .then(res => { clearTimeout(timer); resolve(res); })
-      .catch(err => { clearTimeout(timer); reject(err); });
-  });
 };
 
 export default function IdeaForge() {
@@ -294,16 +290,21 @@ export default function IdeaForge() {
 
   const downloadComicImages = () => { comicImages.forEach((img, idx) => { const a = document.createElement("a"); a.href = img.url; a.download = `comic-panel-${idx + 1}.png`; a.click(); }); };
   const getActiveModelKey = () => modelConfigs[activeModel]?.key || "";
-  const getActiveModelConfig = () => { const cfg = modelConfigs[activeModel] || {}; return { url: cfg.url || DEFAULT_MODELS[activeModel]?.url || "", model: cfg.model || DEFAULT_MODELS[activeModel]?.defaultModel || "" }; };
+  const getActiveModelConfig = () => {
+    const cfg = modelConfigs[activeModel] || {};
+    const defaultModel = DEFAULT_MODELS[activeModel];
+    return {
+      url: cfg.url || (defaultModel?.getUrl ? defaultModel.getUrl() : ""),
+      model: cfg.model || defaultModel?.defaultModel || "",
+    };
+  };
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [stream]);
 
   const generate = async (ideaText, modeId, ans) => {
-    console.log("[generate] START", { ideaText, modeId, ans });
     const m = MODES.find(x => x.id === modeId);
     const modelCfg = getActiveModelConfig();
     const apiKey = getActiveModelKey();
-    console.log("[generate] modelCfg, apiKey present:", { modelCfg, hasKey: !!apiKey });
 
     if (!apiKey) {
       alert("请先在设置中配置 " + DEFAULT_MODELS[activeModel].name + " 的 API Key");
@@ -311,7 +312,6 @@ export default function IdeaForge() {
       return;
     }
 
-    // 先切换到 generating 状态（必须最先做）
     setPhase("generating");
     setStream("");
     setFinal("");
@@ -322,78 +322,59 @@ export default function IdeaForge() {
     savedAnswersRef.current = ans;
 
     const isAnthropic = activeModel === "anthropic-claude";
-    const PROXY_MAP = { "anthropic-claude": "/api/anthropic", "openai-gpt4": "/api/openai", "groq-llama": "/api/groq", "deepseek-chat": "/api/deepseek", "qwen-turbo": "/api/dashscope", "minimax": "/api/minimax", "siliconflow": "/api/siliconflow" };
-    const proxyBase = PROXY_MAP[activeModel] || "";
 
-    const headers = { "Content-Type": "application/json", ...(isAnthropic ? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" } : { "Authorization": `Bearer ${apiKey}` }) };
+    const headers = {
+      "Content-Type": "application/json",
+      ...(isAnthropic ? { "x-api-key": apiKey, "anthropic-version": "2023-06-01" } : { "Authorization": `Bearer ${apiKey}` }),
+    };
+
     const body = isAnthropic
-      ? { model: modelCfg.model || "claude-sonnet-4-20250514", max_tokens: 4096, stream: true, system: m?.systemPrompt?.(ans) || "", messages: [{ role: "user", content: `想法：${ideaText}` }] }
-      : { model: modelCfg.model, max_tokens: 4096, stream: true, messages: [{ role: "user", content: `你是一个专业的需求分析师。请生成内容。\n\n用户想法：${ideaText}` }] };
+      ? { model: modelCfg.model || "claude-sonnet-4-20250514", max_tokens: 4096, stream: false,
+          system: m.systemPrompt(ans), messages: [{ role: "user", content: `想法：${ideaText}` }] }
+      : { model: modelCfg.model, max_tokens: 4096, stream: false,
+          messages: [{ role: "user", content: `你是一个专业的需求分析师。请严格按照以下规格生成文档。\n\n规格类型：${m.label}\n\n${m.systemPrompt(ans)}\n\n---\n用户想法：${ideaText}` }] };
 
     try {
-      const isCapacitor = detectCapacitor();
-      const requestUrl = isCapacitor ? modelCfg.url : proxyBase + modelCfg.url.replace(/^https?:\/\/[^/]+/, "");
-
-      const dbg = `【调试信息】\n请求URL: ${requestUrl}\n模型: ${DEFAULT_MODELS[activeModel]?.name}\nAPI Key: ${apiKey ? '已配置 ✓' : '未配置 ✗'}\nCapacitor: ${isCapacitor ? '是 ✓' : '否 (使用代理)'}\n完整API URL: ${modelCfg.url}`;
+      setGenStatus("connecting");
+      const dbg = `【调试信息】\n请求URL: ${modelCfg.url}\n模型: ${DEFAULT_MODELS[activeModel]?.name}\nAPI Key: ${apiKey ? '已配置 ✓' : '未配置 ✗'}\nCapacitor: ${isCapacitor ? '是 ✓' : '否 (使用代理)'}`;
       setDebugInfo(dbg);
-      console.log("[generate] FETCH START", { requestUrl, isCapacitor });
 
-      let resp;
-      try {
-        resp = await fetchWithTimeout(requestUrl, { method: "POST", headers, body: JSON.stringify(body) }, 20000);
-        console.log("[generate] FETCH OK", { status: resp.status, ok: resp.ok });
-      } catch (fetchErr) {
-        console.error("[generate] FETCH ERROR", fetchErr);
-        const errMsg = `网络错误: ${fetchErr.message}`;
-        setDebugInfo(dbg + `\n\n❌ ${errMsg}`);
-        setGenStatus("error");
-        setGenError(errMsg + "\n\n可能原因：\n1. 手机无网络连接\n2. API 地址被拦截\n3. Android 系统阻止了请求");
-        return;
+      const resp = await Http.request({
+        url: modelCfg.url,
+        method: "POST",
+        headers,
+        data: body,
+      });
+
+      if (resp.status < 200 || resp.status >= 300) {
+        throw new Error(`HTTP ${resp.status}: ${JSON.stringify(resp.data).slice(0, 200)}`);
       }
 
-      if (!resp.ok) {
-        let errorText = "";
-        try { errorText = await resp.text(); } catch { errorText = "无法读取错误详情"; }
-        const errMsg = `HTTP ${resp.status}: ${errorText.slice(0, 200)}`;
-        console.error("[generate] HTTP ERROR", errMsg);
-        setDebugInfo(dbg + `\n\n❌ ${errMsg}`);
-        setGenStatus("error");
-        setGenError(errMsg);
-        setPhase("output"); // 切换到 output phase 以显示错误
-        return;
-      }
-
-      // 流式响应处理
-      setGenStatus("streaming");
-      setDebugInfo(dbg + `\n\n✓ 已连接，正在接收数据...`);
-      const reader = resp.body.getReader();
-      const dec = new TextDecoder();
-      let full = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        for (const l of dec.decode(value).split("\n")) {
-          if (!l.startsWith("data: ")) continue;
-          if (l.trim() === "data: [DONE]") break;
-          try {
-            const d = JSON.parse(l.slice(6));
-            if (d.type === "content_block_delta" && d.delta?.text) { full += d.delta.text; setStream(full); setSectCount((full.match(/^#{1,2} /gm) || []).length); }
-            if (d.choices && d.choices[0]?.delta?.content) { full += d.choices[0].delta.content; setStream(full); setSectCount((full.match(/^#{1,2} /gm) || []).length); }
-          } catch (e) {}
-        }
-      }
       setGenStatus("done");
+      let full = "";
+
+      // Anthropic 格式
+      if (isAnthropic && resp.data?.content?.[0]?.text) {
+        full = resp.data.content[0].text;
+      }
+      // OpenAI/Groq/DeepSeek 格式
+      else if (resp.data?.choices?.[0]?.message?.content) {
+        full = resp.data.choices[0].message.content;
+      } else {
+        throw new Error("无法解析响应格式: " + JSON.stringify(resp.data).slice(0, 200));
+      }
+
       setFinal(full);
+      setStream(full);
+      setSectCount((full.match(/^#{1,2} /gm) || []).length);
       setPhase("output");
       setDebugInfo(dbg + `\n\n✓ 生成完成！`);
       setHistory(prev => [{id:Date.now(),modeId,idea:ideaText.slice(0,60),text:full,answers:{...ans},time:new Date().toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit"})},...prev.slice(0,9)]);
     } catch (e) {
-      console.error("[generate] CATCH ERROR", e);
       setGenStatus("error");
-      const errMsg = e.message || "生成失败";
-      setGenError(errMsg);
-      setDebugInfo(prev => prev + `\n\n❌ 异常: ${errMsg}`);
-      setPhase("output"); // 切换到 output phase 以显示错误
+      setGenError(e.message || "生成失败，请检查网络和 API 配置");
+      setPhase("clarify");
+      setDebugInfo(prev => prev + `\n\n❌ 错误: ${e.message}`);
     }
   };
 
@@ -519,7 +500,7 @@ export default function IdeaForge() {
                 <div key={key} style={{background:"#F8FBFF",border:"1px solid #B0D4E8",borderRadius:8,padding:"0.8rem"}}>
                   <div style={{fontSize:"0.85rem",color:"#004488",marginBottom:"0.5rem",fontWeight:600}}>{model.name}</div>
                   <div style={{marginBottom:"0.5rem"}}><div style={{fontSize:"0.68rem",color:"#6699BB",marginBottom:"0.2rem"}}>API Key</div><div style={{display:"flex",gap:"0.3rem"}}><input type={showKeyIds[key] ? "text" : "password"} value={modelConfigs[key]?.key || ""} onChange={(e) => updateModelConfig(key, "key", e.target.value)} placeholder={model.keyPlaceholder || "输入 API Key"} style={{flex:1,padding:"0.4rem 0.5rem",border:"1px solid #B0D4E8",borderRadius:4,fontSize:"0.78rem",background:"#FFFFFF",color:"#000",boxSizing:"border-box"}} /><button onClick={() => toggleShowKey(key)} style={{padding:"0.3rem 0.5rem",border:"1px solid #B0D4E8",borderRadius:4,background:"#FFFFFF",cursor:"pointer",fontSize:"0.7rem",color:"#004488"}}>{showKeyIds[key] ? "🔒" : "👁"}</button></div></div>
-                  <div style={{marginBottom:"0.5rem"}}><div style={{fontSize:"0.68rem",color:"#6699BB",marginBottom:"0.2rem"}}>API 地址 <span style={{fontSize:"0.6rem",color:"#88AACC"}}>（选填，使用默认则留空）</span></div><input type="text" value={modelConfigs[key]?.url || model.url || ""} onChange={(e) => updateModelConfig(key, "url", e.target.value)} placeholder={model.url || "https://..."} style={{width:"100%",padding:"0.4rem 0.5rem",border:"1px solid #B0D4E8",borderRadius:4,fontSize:"0.78rem",background:"#FFFFFF",color:"#000",boxSizing:"border-box"}} /></div>
+                  <div style={{marginBottom:"0.5rem"}}><div style={{fontSize:"0.68rem",color:"#6699BB",marginBottom:"0.2rem"}}>API 地址 <span style={{fontSize:"0.6rem",color:"#88AACC"}}>（选填，使用默认则留空）</span></div><input type="text" value={modelConfigs[key]?.url || (model.getUrl ? model.getUrl() : "") || ""} onChange={(e) => updateModelConfig(key, "url", e.target.value)} placeholder={model.getUrl ? model.getUrl() : ""} style={{width:"100%",padding:"0.4rem 0.5rem",border:"1px solid #B0D4E8",borderRadius:4,fontSize:"0.78rem",background:"#FFFFFF",color:"#000",boxSizing:"border-box"}} /></div>
                   {model.models ? (<div><div style={{fontSize:"0.68rem",color:"#6699BB",marginBottom:"0.2rem"}}>选择模型</div><select value={modelConfigs[key]?.model || model.defaultModel || ""} onChange={(e) => updateModelConfig(key, "model", e.target.value)} style={{width:"100%",padding:"0.4rem 0.5rem",border:"1px solid #B0D4E8",borderRadius:4,fontSize:"0.78rem",background:"#FFFFFF",color:"#000",boxSizing:"border-box"}}>{model.models.map(m => <option key={m} value={m}>{m}</option>)}</select></div>) : (<div><div style={{fontSize:"0.68rem",color:"#6699BB",marginBottom:"0.2rem"}}>模型</div><input type="text" value={modelConfigs[key]?.model || model.defaultModel || ""} onChange={(e) => updateModelConfig(key, "model", e.target.value)} placeholder={model.defaultModel || "如: gpt-4-turbo"} style={{width:"100%",padding:"0.4rem 0.5rem",border:"1px solid #B0D4E8",borderRadius:4,fontSize:"0.78rem",background:"#FFFFFF",color:"#000",boxSizing:"border-box"}} /></div>)}
                 </div>
               ))}
