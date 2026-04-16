@@ -51,7 +51,7 @@ const DEFAULT_MODELS = {
     name: "MiniMax (海螺)",
     getUrl: () => getModelUrl('minimax', 'https://api.minimax.chat', '/v1/text/chatcompletion_v2'),
     keyPlaceholder: "eyJh...",
-    defaultModel: "MiniMax-Text-01",
+    defaultModel: "minimax-m2.7",
   },
   "siliconflow": {
     name: "SiliconFlow (硅基流动)",
