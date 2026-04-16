@@ -401,6 +401,24 @@ export default function IdeaForge() {
           </div>
         </div>
 
+        {/* 持久错误横幅 - 始终显示错误信息 */}
+        {genError && (
+          <div style={{background:"#FFEBEE",border:"2px solid #EF4444",borderRadius:10,padding:"1rem",marginBottom:"1rem"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginBottom:"0.5rem"}}>
+              <span style={{fontSize:"1.2rem"}}>❌</span>
+              <span style={{fontWeight:600,color:"#DC2626",fontSize:"0.9rem"}}>生成失败</span>
+              <button onClick={()=>setGenError("")} style={{marginLeft:"auto",background:"transparent",border:"none",cursor:"pointer",color:"#888",fontSize:"1rem"}}>×</button>
+            </div>
+            <div style={{color:"#991B1B",fontSize:"0.8rem",marginBottom:"0.5rem"}}>{genError}</div>
+            {debugInfo && (
+              <details style={{marginTop:"0.5rem"}}>
+                <summary style={{cursor:"pointer",color:"#666",fontSize:"0.75rem"}}>查看调试信息</summary>
+                <pre style={{marginTop:"0.5rem",padding:"0.5rem",background:"#1a1a2e",borderRadius:6,fontSize:"0.65rem",fontFamily:"'Courier New',monospace",color:"#0f0",whiteSpace:"pre-wrap",wordBreak:"break-all",maxHeight:200,overflowY:"auto"}}>{debugInfo}</pre>
+              </details>
+            )}
+          </div>
+        )}
+
         {showHist&&history.length>0&&(
           <div style={{marginBottom:"1.3rem",background:"#FFFFFF",border:"1px solid #B0D4E8",borderRadius:9,padding:"0.8rem"}}>
             <div style={{fontSize:"0.65rem",color:"#004488",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:"0.55rem"}}>历史记录</div>
