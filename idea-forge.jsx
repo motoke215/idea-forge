@@ -359,9 +359,11 @@ export default function IdeaForge() {
         setDebugInfo(dbg + `\n\n❌ ${errMsg}`);
         setGenStatus("error");
         setGenError(errMsg);
+        setPhase("output"); // 切换到 output phase 以显示错误
         return;
       }
 
+      // 流式响应处理
       setGenStatus("streaming");
       setDebugInfo(dbg + `\n\n✓ 已连接，正在接收数据...`);
       const reader = resp.body.getReader();
@@ -391,6 +393,7 @@ export default function IdeaForge() {
       const errMsg = e.message || "生成失败";
       setGenError(errMsg);
       setDebugInfo(prev => prev + `\n\n❌ 异常: ${errMsg}`);
+      setPhase("output"); // 切换到 output phase 以显示错误
     }
   };
 
@@ -516,6 +519,7 @@ export default function IdeaForge() {
                 <div key={key} style={{background:"#F8FBFF",border:"1px solid #B0D4E8",borderRadius:8,padding:"0.8rem"}}>
                   <div style={{fontSize:"0.85rem",color:"#004488",marginBottom:"0.5rem",fontWeight:600}}>{model.name}</div>
                   <div style={{marginBottom:"0.5rem"}}><div style={{fontSize:"0.68rem",color:"#6699BB",marginBottom:"0.2rem"}}>API Key</div><div style={{display:"flex",gap:"0.3rem"}}><input type={showKeyIds[key] ? "text" : "password"} value={modelConfigs[key]?.key || ""} onChange={(e) => updateModelConfig(key, "key", e.target.value)} placeholder={model.keyPlaceholder || "输入 API Key"} style={{flex:1,padding:"0.4rem 0.5rem",border:"1px solid #B0D4E8",borderRadius:4,fontSize:"0.78rem",background:"#FFFFFF",color:"#000",boxSizing:"border-box"}} /><button onClick={() => toggleShowKey(key)} style={{padding:"0.3rem 0.5rem",border:"1px solid #B0D4E8",borderRadius:4,background:"#FFFFFF",cursor:"pointer",fontSize:"0.7rem",color:"#004488"}}>{showKeyIds[key] ? "🔒" : "👁"}</button></div></div>
+                  <div style={{marginBottom:"0.5rem"}}><div style={{fontSize:"0.68rem",color:"#6699BB",marginBottom:"0.2rem"}}>API 地址 <span style={{fontSize:"0.6rem",color:"#88AACC"}}>（选填，使用默认则留空）</span></div><input type="text" value={modelConfigs[key]?.url || model.url || ""} onChange={(e) => updateModelConfig(key, "url", e.target.value)} placeholder={model.url || "https://..."} style={{width:"100%",padding:"0.4rem 0.5rem",border:"1px solid #B0D4E8",borderRadius:4,fontSize:"0.78rem",background:"#FFFFFF",color:"#000",boxSizing:"border-box"}} /></div>
                   {model.models ? (<div><div style={{fontSize:"0.68rem",color:"#6699BB",marginBottom:"0.2rem"}}>选择模型</div><select value={modelConfigs[key]?.model || model.defaultModel || ""} onChange={(e) => updateModelConfig(key, "model", e.target.value)} style={{width:"100%",padding:"0.4rem 0.5rem",border:"1px solid #B0D4E8",borderRadius:4,fontSize:"0.78rem",background:"#FFFFFF",color:"#000",boxSizing:"border-box"}}>{model.models.map(m => <option key={m} value={m}>{m}</option>)}</select></div>) : (<div><div style={{fontSize:"0.68rem",color:"#6699BB",marginBottom:"0.2rem"}}>模型</div><input type="text" value={modelConfigs[key]?.model || model.defaultModel || ""} onChange={(e) => updateModelConfig(key, "model", e.target.value)} placeholder={model.defaultModel || "如: gpt-4-turbo"} style={{width:"100%",padding:"0.4rem 0.5rem",border:"1px solid #B0D4E8",borderRadius:4,fontSize:"0.78rem",background:"#FFFFFF",color:"#000",boxSizing:"border-box"}} /></div>)}
                 </div>
               ))}
