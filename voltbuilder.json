@@ -1,0 +1,8 @@
+{
+    "release": "debug",
+    "platform": "android",
+    "appName": "IdeaForge",
+    "icon": {
+        "android": "android/app/src/main/res/mipmap-hdpi/ic_launcher.png"
+    }
+}
