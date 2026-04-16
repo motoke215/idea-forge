@@ -1,5 +1,8 @@
 {
   "appId": "com.ideaforge.app",
   "appName": "Idea Forge",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
 }
